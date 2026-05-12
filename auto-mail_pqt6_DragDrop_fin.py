@@ -502,7 +502,7 @@ class MailAutomationApp(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("(RPA) 업무자동화 프로그램_v0.1")
+        self.setWindowTitle("(RPA) 업무자동화 프로그램_v0.4")
         self.stop_flag = False
         self.capturing_idx = None
         self.excel_columns = []
@@ -671,6 +671,18 @@ class MailAutomationApp(QMainWindow):
         l4.setContentsMargins(12, 8, 12, 10)
         l4.setSpacing(6)
 
+        # ── Ⅱ 섹션 헤더 행 (제목 레이블 + 초기화 버튼) ──────────
+        sec2_header = QHBoxLayout()
+        sec2_header.setSpacing(8)
+        sec2_header.addStretch()
+        btn_pos_reset = QPushButton("🔄 초기화")
+        btn_pos_reset.setObjectName("Danger")
+        btn_pos_reset.setFixedHeight(28)
+        btn_pos_reset.setToolTip("위치 좌표 및 메모 전체 초기화")
+        btn_pos_reset.clicked.connect(self.reset_positions)
+        sec2_header.addWidget(btn_pos_reset)
+        l4.addLayout(sec2_header)
+
         # ── ① 변수명 버튼화 ──────────────────────────────────
         var_label = QLabel("① 변수명 버튼화")
         var_label.setStyleSheet(
@@ -783,11 +795,13 @@ class MailAutomationApp(QMainWindow):
             ("Alt+O",    "kbd_alt_o",     "열기(파일대화상자)"),
             ("Alt+D",    "kbd_alt_d",     "주소표시줄 포커스"),
             ("Win+D",    "kbd_win_d",     "바탕화면 보기"),
+            ("Alt+Tab",  "kbd_alt_tab",   "창 전환(Alt+Tab)"),
             ("F5",       "kbd_f5",        "새로고침"),
             ("대기0.5s", "wait_0.5",      "0.5초 대기"),
             ("대기1s",   "wait_1",        "1초 대기"),
             ("대기2s",   "wait_2",        "2초 대기"),
             ("대기3s",   "wait_3",        "3초 대기"),
+            ("대기5s",   "wait_5",        "5초 대기"),
         ]
         self.kbd_action_map = {a[1]: a for a in KBD_ACTIONS}
 
@@ -1016,15 +1030,6 @@ class MailAutomationApp(QMainWindow):
     # ══════════════════════════════════════════════════════════
     #  DIY 실행 (내부 공통)
     # ══════════════════════════════════════════════════════════
-    def run_diy(self, row_index=None):
-        actions = self.diy_diagram.get_actions()
-        if not actions:
-            QMessageBox.information(self, "DIY 실행",
-                "Ⅲ. DIY 작업 조합에 배치된 슬롯이 없습니다.\n"
-                "버튼을 드래그하여 슬롯에 먼저 배치하세요.")
-            return False
-        return True, actions, row_index
-
     def _diy_thread(self, actions, row_index=None):
         for key, label in actions:
             if self.stop_flag:
@@ -1061,8 +1066,11 @@ class MailAutomationApp(QMainWindow):
             val = self.pos_inputs[idx].text()
             label_text = self.memo_inputs[idx].text() or f"위치{idx+1}"
             if val and ',' in val:
-                x, y = map(int, val.split(','))
-                pyautogui.click(x, y)
+                try:
+                    x, y = map(lambda v: int(float(v)), val.split(','))
+                    pyautogui.click(x, y)
+                except ValueError:
+                    self.add_log(f"  ⚠ [{label}] 좌표 형식 오류: '{val}'")
                 time.sleep(0.3)
             else:
                 self.add_log(f"  ⚠ [{label}] 좌표 미설정, 건너뜁니다.")
@@ -1089,15 +1097,28 @@ class MailAutomationApp(QMainWindow):
         elif key == "kbd_alt_o":      pyautogui.hotkey('alt', 'o')
         elif key == "kbd_alt_d":      pyautogui.hotkey('alt', 'd')
         elif key == "kbd_win_d":      pyautogui.hotkey('win', 'd')
+        elif key == "kbd_alt_tab":    pyautogui.hotkey('alt', 'tab')
         elif key == "kbd_f5":         pyautogui.press('f5')
         elif key == "wait_0.5":       time.sleep(0.5)
         elif key == "wait_1":         time.sleep(1.0)
         elif key == "wait_2":         time.sleep(2.0)
         elif key == "wait_3":         time.sleep(3.0)
+        elif key == "wait_5":         time.sleep(5.0)
 
     def reset_diy(self):
         self.diy_diagram.reset()
         self.add_log("🔄 DIY 작업 조합 초기화")
+
+    # ══════════════════════════════════════════════════════════
+    #  Ⅱ섹션 위치 좌표 초기화
+    # ══════════════════════════════════════════════════════════
+    def reset_positions(self):
+        for pi in self.pos_inputs:
+            pi.clear()
+        for mi in self.memo_inputs:
+            mi.clear()
+        self.save_config()
+        self.add_log("🔄 위치 좌표 및 메모 전체 초기화")
 
     # ══════════════════════════════════════════════════════════
     #  ★ [수정2] DIY 작업조합만 실행 (엑셀 없이) — 반복 횟수 입력 포함
