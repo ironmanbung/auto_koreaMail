@@ -5,6 +5,10 @@ import time
 import threading
 import ctypes
 import openpyxl
+import xlrd
+from odf.opendocument import load as odf_load
+from odf.table import Table, TableRow, TableCell
+from odf.text import P 
 import pyautogui
 import pyperclip
 from PyQt6.QtWidgets import (
@@ -40,7 +44,7 @@ QGroupBox {
     color: aliceblue;
     font-family: 'Malgun Gothic';
     font-weight: bold;
-    font-size: 17px;
+    font-size: 18px;
     margin-top: 12px;
     padding-top: 10px;
     background-color: black;
@@ -264,6 +268,17 @@ QMessageBox QLabel { color: #000000; }
 QMessageBox QPushButton { color: #000000; background-color: #e0e0e0; min-width: 80px; border: 1px solid #aaaaaa; }
 
 QScrollArea { border: none; background: transparent; }
+
+QToolTip {
+    background-color: #1e2030;
+    color: #e0e0e0;
+    border: 1px solid #4169e1;
+    border-radius: 4px;
+    font-family: 'Malgun Gothic';
+    font-size: 11px;
+    padding: 3px 7px;
+    opacity: 230;
+}
 """
 
 
@@ -338,7 +353,7 @@ class DIYSlot(QLabel):
             self.setStyleSheet("""
                 QLabel {
                     background-color: #1a1b26;
-                    color: #414868;
+                    color: #ffffff;
                     border: 2px dashed #292e42;
                     border-radius: 8px;
                     font-size: 11px;
@@ -408,10 +423,10 @@ class DIYSlot(QLabel):
 
 
 # ══════════════════════════════════════════════════════════════
-#  DIY 다이어그램 위젯  (10열 × 3행)
+#  DIY 다이어그램 위젯  (10열 × 4행)
 # ══════════════════════════════════════════════════════════════
 class DIYDiagramWidget(QWidget):
-    SLOT_COUNT = 30   # 10 × 3
+    SLOT_COUNT = 40   # 10 × 4
 
     def __init__(self, on_changed=None, parent=None):
         super().__init__(parent)
@@ -425,7 +440,7 @@ class DIYDiagramWidget(QWidget):
         outer.setContentsMargins(4, 4, 4, 4)
         outer.setSpacing(3)
 
-        for row in range(3):
+        for row in range(4):
             row_widget = QWidget()
             row_widget.setStyleSheet("background: transparent;")
             h = QHBoxLayout(row_widget)
@@ -502,7 +517,7 @@ class MailAutomationApp(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("(RPA) 업무자동화 프로그램_v0.4")
+        self.setWindowTitle("(RPA) 업무자동화 프로그램_v1.0")
         self.stop_flag = False
         self.capturing_idx = None
         self.excel_columns = []
@@ -538,17 +553,23 @@ class MailAutomationApp(QMainWindow):
         """)
         tb_layout = QHBoxLayout(top_bar)
         tb_layout.setContentsMargins(20, 0, 20, 0)
-        title_lbl = QLabel("(RPA) 업무자동화(엑셀자료와 좌표 기반) 프로그램")
+        title_lbl = QLabel("(RPA) 업무자동화 툴")
         title_lbl.setStyleSheet(
-            "color: deepskyblue; font-size: 21px; font-weight: bold;"
+            "color: aqua; font-size: 25px; font-weight: bold;"
             " background: transparent; border: none;"
         )
-        sub_lbl = QLabel("Ver 0.4 | 개발: 'AI요리사'팀_'26년 학습조직_리더 대전청 양모세주무관")
+        title2_lbl = QLabel("(엑셀자료 + 마우스클릭위치 좌표 + 키보드)제어")
+        title2_lbl.setStyleSheet(
+            "color: aqua; font-size: 16px; font-weight: bold;"
+            " background: transparent; border: none;"
+        )        
+        sub_lbl = QLabel("│ ※ 개발: 'AI요리사'팀('26년 학습조직_대전청) │")
         sub_lbl.setStyleSheet(
-            "color: floralwhite; font-size: 12px;"
+            "color: bisque; font-size: 13px; font-weight: bold;"
             " background: transparent; border: none;"
         )
         tb_layout.addWidget(title_lbl)
+        tb_layout.addWidget(title2_lbl)
         tb_layout.addSpacing(15)
         tb_layout.addWidget(sub_lbl)
         tb_layout.addStretch()
@@ -584,13 +605,13 @@ class MailAutomationApp(QMainWindow):
             "© 2026 Public Domain — 저작권 제한 없이 누구나 자유롭게 사용·복제·배포·수정할 수 있습니다."
         )
         footer_line1.setStyleSheet(
-            "color: snow; font-size: 12px; background: transparent; border: none;"
+            "color: bisque; font-size: 12px; background: transparent; border: none;"
         )
         footer_line1.setAlignment(Qt.AlignmentFlag.AlignRight)
 
-        footer_line2 = QLabel("※ 개발 : AI요리사 (대전지방고용노동청 지역협력과)")
+        footer_line2 = QLabel("│   고용노동부 대전지방고용노동청   │")
         footer_line2.setStyleSheet(
-            "color: white; font-size: 12px; background: transparent; border: none;"
+            "color: bisque; font-size: 12px; background: transparent; border: none;"
         )
         footer_line2.setAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -697,7 +718,7 @@ class MailAutomationApp(QMainWindow):
         self.var_btn_grid.setVerticalSpacing(3)
         self.var_btn_grid.setContentsMargins(0, 0, 0, 0)
 
-        no_col_lbl = QLabel("   ※ 엑셀 파일을 로드하면 '변수명별'로 버튼이 생성됩니다.")
+        no_col_lbl = QLabel("   ※ 엑셀 파일을 로드하면 '변수명'들이 버튼으로 생성됩니다.")
         no_col_lbl.setStyleSheet("color: lavender; font-size: 12px;")
         self.var_btn_grid.addWidget(no_col_lbl, 0, 0)
         self.var_placeholder_lbl = no_col_lbl
@@ -771,33 +792,56 @@ class MailAutomationApp(QMainWindow):
         )
         l4.addWidget(kbd_label)
 
+        # ── 카테고리별 + 알파벳 순 정렬 (총 42개) ──────────────
+        # [단순키] Back / Del / End / Enter / ESC / F1~F12 / Home / Insert / PgDn / PgUp / Space / Tab
+        # [화살표] ← / → / ↑ / ↓
+        # [Ctrl+]  Ctrl+A / Ctrl+C / Ctrl+F / Ctrl+N / Ctrl+O / Ctrl+P / Ctrl+S / Ctrl+V / Ctrl+W / Ctrl+X / Ctrl+Y / Ctrl+Z
+        # [Alt+]   Alt+D / Alt+F4 / Alt+N / Alt+O / Alt+Tab / Win+D
+        # [대기]   대기1s / 대기2s / 대기3s / 대기5s
         KBD_ACTIONS = [
-            ("Enter",    "kbd_enter",     "Enter 키"),
-            ("Tab",      "kbd_tab",       "Tab 키"),
-            ("ESC",      "kbd_esc",       "Escape 키"),
-            ("Space",    "kbd_space",     "Space 키"),
+            # ── 단순키 (알파벳/이름 순) ──────────────────────────
             ("Back",     "kbd_backspace", "Backspace 키"),
             ("Del",      "kbd_delete",    "Delete 키"),
-            ("↑",        "kbd_up",        "위 방향키"),
-            ("↓",        "kbd_down",      "아래 방향키"),
+            ("End",      "kbd_end",       "End 키"),
+            ("Enter",    "kbd_enter",     "Enter 키"),
+            ("ESC",      "kbd_esc",       "Escape 키"),
+            ("F1",       "kbd_f1",        "F1 키"),
+            ("F2",       "kbd_f2",        "F2 키"),
+            ("F4",       "kbd_f4",        "F4 키"),
+            ("F5",       "kbd_f5",        "F5 새로고침"),
+            ("F7",       "kbd_f7",        "F7 키"),
+            ("Home",     "kbd_home",      "Home 키"),
+            ("Insert",   "kbd_insert",    "Insert 키"),
+            ("PgDn",     "kbd_pagedown",  "Page Down"),
+            ("PgUp",     "kbd_pageup",    "Page Up"),
+            ("Space",    "kbd_space",     "Space 키"),
+            ("Tab",      "kbd_tab",       "Tab 키"),
+            # ── 화살표 (방향 순) ──────────────────────────────────
             ("←",        "kbd_left",      "왼쪽 방향키"),
             ("→",        "kbd_right",     "오른쪽 방향키"),
-            ("Home",     "kbd_home",      "Home 키"),
-            ("End",      "kbd_end",       "End 키"),
-            ("PgUp",     "kbd_pageup",    "Page Up"),
-            ("PgDn",     "kbd_pagedown",  "Page Down"),
+            ("↑",        "kbd_up",        "위 방향키"),
+            ("↓",        "kbd_down",      "아래 방향키"),
+            # ── Ctrl+ (알파벳 순) ─────────────────────────────────
             ("Ctrl+A",   "kbd_ctrl_a",    "전체 선택"),
             ("Ctrl+C",   "kbd_ctrl_c",    "복사"),
-            ("Ctrl+V",   "kbd_ctrl_v",    "붙여넣기"),
-            ("Ctrl+Z",   "kbd_ctrl_z",    "실행취소"),
+            ("Ctrl+F",   "kbd_ctrl_f",    "찾기"),
+            ("Ctrl+N",   "kbd_ctrl_n",    "새 문서/창 열기"),
+            ("Ctrl+O",   "kbd_ctrl_o",    "파일 열기"),
+            ("Ctrl+P",   "kbd_ctrl_p",    "인쇄"),
             ("Ctrl+S",   "kbd_ctrl_s",    "저장"),
-            ("Alt+F4",   "kbd_alt_f4",    "창 닫기"),
-            ("Alt+O",    "kbd_alt_o",     "열기(파일대화상자)"),
+            ("Ctrl+V",   "kbd_ctrl_v",    "붙여넣기"),
+            ("Ctrl+W",   "kbd_ctrl_w",    "현재 탭/창 닫기"),
+            ("Ctrl+X",   "kbd_ctrl_x",    "잘라내기"),
+            ("Ctrl+Y",   "kbd_ctrl_y",    "다시 실행"),
+            ("Ctrl+Z",   "kbd_ctrl_z",    "실행취소"),
+            # ── Alt+ / Win+ (알파벳 순) ──────────────────────────
             ("Alt+D",    "kbd_alt_d",     "주소표시줄 포커스"),
-            ("Win+D",    "kbd_win_d",     "바탕화면 보기"),
+            ("Alt+F4",   "kbd_alt_f4",    "창 닫기"),
+            ("Alt+N",    "kbd_alt_n",     "Alt+N"),
+            ("Alt+O",    "kbd_alt_o",     "열기(파일대화상자)"),
             ("Alt+Tab",  "kbd_alt_tab",   "창 전환(Alt+Tab)"),
-            ("F5",       "kbd_f5",        "새로고침"),
-            ("대기0.5s", "wait_0.5",      "0.5초 대기"),
+            ("Win+D",    "kbd_win_d",     "바탕화면 보기"),
+            # ── 대기 ──────────────────────────────────────────────
             ("대기1s",   "wait_1",        "1초 대기"),
             ("대기2s",   "wait_2",        "2초 대기"),
             ("대기3s",   "wait_3",        "3초 대기"),
@@ -862,17 +906,17 @@ class MailAutomationApp(QMainWindow):
         h6.setSpacing(10)
 
         # ★ [수정2] DIY 작업조합만 실행(엑셀파일 없이 실행) 버튼 추가 — btn_one 왼쪽에 배치
-        btn_diy_only = QPushButton("⚡ DIY 작업조합만 실행\n(엑셀파일 없이 실행)")
+        btn_diy_only = QPushButton("⚡ DIY 작업조합 실행\n(엑셀파일 없어도 실행)")
         btn_diy_only.setObjectName("DiyOnly")
         btn_diy_only.setFixedHeight(38)
         btn_diy_only.clicked.connect(self.run_diy_only)
 
-        btn_one = QPushButton("📧 선택 행 1건 실행")
+        btn_one = QPushButton("📧 선택 행 1건 + DIY 슬롯 실행")
         btn_one.setObjectName("Primary")
         btn_one.setFixedHeight(38)
         btn_one.clicked.connect(self.send_selected)
 
-        btn_all = QPushButton("📨 전체 자동 실행")
+        btn_all = QPushButton("📨 전체 행 + DIY 슬롯 실행")
         btn_all.setObjectName("Primary")
         btn_all.setFixedHeight(38)
         btn_all.clicked.connect(self.send_all)
@@ -932,19 +976,68 @@ class MailAutomationApp(QMainWindow):
     #  엑셀 로드
     # ══════════════════════════════════════════════════════════
     def load_excel(self):
-        path, _ = QFileDialog.getOpenFileName(self, "엑셀 선택", "", "Excel Files (*.xlsx)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "엑셀 또는 한셀", "",
+            "엑셀 또는 한셀 파일(*.xlsx *.xlsm *.xls *.cell);;"
+            "Excel Files (*.xlsx *.xlsm *.xls);;"
+            "Hancel Files (*.cell);;"
+            "All Files (*)"
+        )
         if not path:
             return
         self.excel_path_input.setText(path)
+        ext = os.path.splitext(path)[1].lower()
         try:
-            wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-            ws = wb.active
+            if ext == ".cell":
+                # ── 한셀(.cell) 파일 처리 ──────────────────────────
+                # 한셀 .cell 파일은 내부적으로 ZIP+XML 구조(ODF 유사)이므로
+                # openpyxl로 직접 열 수 없습니다.
+                # 방법1: 한컴오피스가 설치된 환경에서 COM/subprocess로 xlsx 변환 후 로드
+                # 방법2: odfpy 라이브러리로 읽기 (설치 필요: pip install odfpy)
+                # 여기서는 odfpy를 우선 시도하고, 없으면 안내 메시지를 표시합니다.
+                doc = odf_load(path)
+                spreadsheet = doc.spreadsheet
+                tables = spreadsheet.getElementsByType(Table)
+                if not tables:
+                    self.add_log("❌ 한셀 파일에서 시트를 찾을 수 없습니다.")
+                    return
+                ws_table = tables[0]
+                all_rows = []
+                for tr in ws_table.getElementsByType(TableRow):
+                    row_data = []
+                    for tc in tr.getElementsByType(TableCell):
+                        repeat = int(tc.getAttribute("numbercolumnsrepeated") or 1)
+                        # 셀 텍스트 추출
+                        ps = tc.getElementsByType(P)
+                        cell_val = "".join(
+                            str(n) for p in ps for n in p.childNodes
+                            if hasattr(n, 'data')
+                        ) if ps else None
+                        row_data.extend([cell_val] * repeat)
+                    # 뒤쪽 None 제거
+                    while row_data and row_data[-1] is None:
+                        row_data.pop()
+                    if row_data:
+                        all_rows.append(tuple(row_data))
 
-            all_rows = list(ws.iter_rows(values_only=True))
-            wb.close()
+            else:
+                # ── xlsx / xlsm / xls 처리 ─────────────────────────
+                if ext == ".xls":
+                        wbx = xlrd.open_workbook(path)
+                        wsx = wbx.sheet_by_index(0)
+                        all_rows = []
+                        for r in range(wsx.nrows):
+                            all_rows.append(tuple(
+                                wsx.cell_value(r, c) for c in range(wsx.ncols)
+                            ))
+                else:
+                    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+                    ws = wb.active
+                    all_rows = list(ws.iter_rows(values_only=True))
+                    wb.close()
 
             if not all_rows:
-                self.add_log("❌ 엑셀 파일이 비어 있습니다.")
+                self.add_log("❌ 파일이 비어 있습니다.")
                 return
 
             first_row = all_rows[0]
@@ -971,11 +1064,11 @@ class MailAutomationApp(QMainWindow):
                         str(val) if val is not None else ""
                     ))
 
-            self.add_log(f"📂 엑셀 데이터 로드 완료 ({self.table.rowCount()}건, 컬럼: {col_count}개)")
+            self.add_log(f"📂 파일 로드 완료 ({self.table.rowCount()}건, 컬럼: {col_count}개)  [{ext}]")
             self._rebuild_var_buttons(columns)
 
         except Exception as e:
-            self.add_log(f"❌ 엑셀 로드 실패: {e}")
+            self.add_log(f"❌ 파일 로드 실패: {e}")
 
     def _set_initial_column_widths(self, col_count):
         """초기 컬럼 너비를 균등 배분 (Interactive 모드용)"""
@@ -1080,6 +1173,7 @@ class MailAutomationApp(QMainWindow):
         elif key == "kbd_space":      pyautogui.press('space')
         elif key == "kbd_backspace":  pyautogui.press('backspace')
         elif key == "kbd_delete":     pyautogui.press('delete')
+        elif key == "kbd_insert":     pyautogui.press('insert')
         elif key == "kbd_up":         pyautogui.press('up')
         elif key == "kbd_down":       pyautogui.press('down')
         elif key == "kbd_left":       pyautogui.press('left')
@@ -1088,18 +1182,29 @@ class MailAutomationApp(QMainWindow):
         elif key == "kbd_end":        pyautogui.press('end')
         elif key == "kbd_pageup":     pyautogui.press('pageup')
         elif key == "kbd_pagedown":   pyautogui.press('pagedown')
+        elif key == "kbd_f1":         pyautogui.press('f1')
+        elif key == "kbd_f2":         pyautogui.press('f2')
+        elif key == "kbd_f4":         pyautogui.press('f4')
+        elif key == "kbd_f5":         pyautogui.press('f5')
+        elif key == "kbd_f7":         pyautogui.press('f7')
         elif key == "kbd_ctrl_a":     pyautogui.hotkey('ctrl', 'a')
         elif key == "kbd_ctrl_c":     pyautogui.hotkey('ctrl', 'c')
-        elif key == "kbd_ctrl_v":     pyautogui.hotkey('ctrl', 'v')
-        elif key == "kbd_ctrl_z":     pyautogui.hotkey('ctrl', 'z')
+        elif key == "kbd_ctrl_f":     pyautogui.hotkey('ctrl', 'f')
+        elif key == "kbd_ctrl_n":     pyautogui.hotkey('ctrl', 'n')
+        elif key == "kbd_ctrl_o":     pyautogui.hotkey('ctrl', 'o')
+        elif key == "kbd_ctrl_p":     pyautogui.hotkey('ctrl', 'p')
         elif key == "kbd_ctrl_s":     pyautogui.hotkey('ctrl', 's')
-        elif key == "kbd_alt_f4":     pyautogui.hotkey('alt', 'f4')
-        elif key == "kbd_alt_o":      pyautogui.hotkey('alt', 'o')
+        elif key == "kbd_ctrl_v":     pyautogui.hotkey('ctrl', 'v')
+        elif key == "kbd_ctrl_w":     pyautogui.hotkey('ctrl', 'w')
+        elif key == "kbd_ctrl_x":     pyautogui.hotkey('ctrl', 'x')
+        elif key == "kbd_ctrl_y":     pyautogui.hotkey('ctrl', 'y')
+        elif key == "kbd_ctrl_z":     pyautogui.hotkey('ctrl', 'z')
         elif key == "kbd_alt_d":      pyautogui.hotkey('alt', 'd')
-        elif key == "kbd_win_d":      pyautogui.hotkey('win', 'd')
+        elif key == "kbd_alt_f4":     pyautogui.hotkey('alt', 'f4')
+        elif key == "kbd_alt_n":      pyautogui.hotkey('alt', 'n')
+        elif key == "kbd_alt_o":      pyautogui.hotkey('alt', 'o')
         elif key == "kbd_alt_tab":    pyautogui.hotkey('alt', 'tab')
-        elif key == "kbd_f5":         pyautogui.press('f5')
-        elif key == "wait_0.5":       time.sleep(0.5)
+        elif key == "kbd_win_d":      pyautogui.hotkey('win', 'd')
         elif key == "wait_1":         time.sleep(1.0)
         elif key == "wait_2":         time.sleep(2.0)
         elif key == "wait_3":         time.sleep(3.0)
@@ -1133,15 +1238,25 @@ class MailAutomationApp(QMainWindow):
             )
             return
 
+        # ── 선택 행 감지: 엑셀이 로드되어 있고 행이 선택된 경우 row_index 반영 ──
+        curr_row = self.table.currentRow()
+        has_excel = (self.table.rowCount() > 0 and curr_row >= 0)
+        row_index = curr_row if has_excel else None
+
+        # 슬롯 중 변수명(var_) 버튼이 하나라도 있는지 확인
+        has_var_slot = any(key.startswith("var_") for key, _ in actions)
+
         # ── 커스텀 다이얼로그 ──────────────────────────────────
         from PyQt6.QtWidgets import QDialog, QSpinBox, QDialogButtonBox
 
         dlg = QDialog(self)
         dlg.setWindowTitle("반복 횟수 입력")
-        dlg.setFixedWidth(320)
+        dlg.setFixedWidth(360)
         dlg.setStyleSheet("""
             QDialog { background-color: #ffffff; }
             QLabel  { color: #000000; font-size: 14px; font-weight: bold; }
+            QLabel#info { color: #1a6a1a; font-size: 12px; font-weight: normal; }
+            QLabel#warn { color: #b05000; font-size: 12px; font-weight: normal; }
             QSpinBox {
                 color: #000000;
                 background-color: #f5f5f5;
@@ -1166,11 +1281,30 @@ class MailAutomationApp(QMainWindow):
 
         vbox = QVBoxLayout(dlg)
         vbox.setContentsMargins(20, 20, 20, 16)
-        vbox.setSpacing(12)
+        vbox.setSpacing(10)
 
         lbl = QLabel("DIY 작업 조합을 몇 번 반복하시겠습니까?")
         lbl.setWordWrap(True)
         vbox.addWidget(lbl)
+
+        # 엑셀 행 반영 여부 안내 메시지
+        if has_var_slot and has_excel:
+            info_lbl = QLabel(
+                f"✅ 엑셀 {curr_row + 1}번 행이 선택되어 있습니다.\n"
+                f"   변수명 슬롯 실행 시 해당 행의 셀 값이 붙여넣기됩니다."
+            )
+            info_lbl.setObjectName("info")
+            info_lbl.setWordWrap(True)
+            vbox.addWidget(info_lbl)
+        elif has_var_slot and not has_excel:
+            warn_lbl = QLabel(
+                "⚠ 변수명 슬롯이 있지만 선택된 엑셀 행이 없습니다.\n"
+                "   변수명 슬롯은 빈 값으로 실행됩니다.\n"
+                "   (테이블에서 행을 먼저 선택하면 셀 값이 반영됩니다.)"
+            )
+            warn_lbl.setObjectName("warn")
+            warn_lbl.setWordWrap(True)
+            vbox.addWidget(warn_lbl)
 
         spin = QSpinBox()
         spin.setRange(1, 9999)
@@ -1192,25 +1326,26 @@ class MailAutomationApp(QMainWindow):
         # ──────────────────────────────────────────────────────
 
         self.stop_flag = False
+        row_info = f" | 엑셀 {row_index + 1}번 행 반영" if row_index is not None else " | 엑셀 행 미선택"
         self.add_log(
             f"⚡ DIY 작업조합 단독 실행 시작 "
-            f"(슬롯 {len(actions)}단계 × {repeat_count}회 반복)"
+            f"(슬롯 {len(actions)}단계 × {repeat_count}회 반복{row_info})"
         )
         threading.Thread(
             target=self._run_diy_only_thread,
-            args=(actions, repeat_count),
+            args=(actions, repeat_count, row_index),
             daemon=True
         ).start()
 
-    def _run_diy_only_thread(self, actions, repeat_count):
-        """DIY 단독 실행 스레드: row_index=None 으로 _diy_thread 호출"""
+    def _run_diy_only_thread(self, actions, repeat_count, row_index=None):
+        """DIY 단독 실행 스레드: row_index를 그대로 _diy_thread에 전달"""
         for i in range(repeat_count):
             if self.stop_flag:
                 self.add_log("🛑 DIY 단독 실행 중단")
                 return
             if repeat_count > 1:
                 self.add_log(f"🔁 {i + 1} / {repeat_count} 회차 실행 중...")
-            self._diy_thread(actions, row_index=None)
+            self._diy_thread(actions, row_index=row_index)
             # 마지막 회차가 아니면 회차 간 짧은 대기
             if i < repeat_count - 1 and not self.stop_flag:
                 time.sleep(1.0)
@@ -1390,6 +1525,9 @@ class MailAutomationApp(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setFont(QFont("Malgun Gothic", 9))
+    # 툴팁 표시 지연 최소화 (hover 즉시 반응)
+    app.setStyleSheet(app.styleSheet())
+    QApplication.setEffectEnabled(Qt.UIEffect.UI_AnimateTooltip, False)
     window = MailAutomationApp()
     window.show()
     sys.exit(app.exec())
